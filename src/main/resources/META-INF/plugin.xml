@@ -17,12 +17,28 @@
     </extensions>
 
     <actions>
-        <action id="ExplainCodeAiAction"
-                class="com.github.leonard2005n.aicodeexplain.Actions.ExplainCodeAction"
-                text="Explain Code with AI"
-                description="Asks Gemma AI to explain the selected code">
-
+        <group id="AiCodeActionsGroup" text="AI Code Tools" popup="true">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
-        </action>
+
+            <action id="ExplainCodeAiAction"
+                    class="com.github.leonard2005n.aicodeexplain.actions.ExplainCodeAction"
+                    text="Explain Code"
+                    description="Asks AI to explain the selected code"/>
+
+            <action id="FindBugsAiAction"
+                    class="com.github.leonard2005n.aicodeexplain.actions.DebugCodeAction"
+                    text="Find Bugs"
+                    description="Asks AI to find potential bugs in the code"/>
+
+            <action id="RefactorCodeAiAction"
+                    class="com.github.leonard2005n.aicodeexplain.actions.RefactorCodeAction"
+                    text="Refactor Code"
+                    description="Asks AI to simplify and refactor the code"/>
+
+            <action id="GenerateTestsAiAction"
+                    class="com.github.leonard2005n.aicodeexplain.actions.GenerateTestsAction"
+                    text="Generate Tests"
+                    description="Asks AI to generate unit tests for the code"/>
+        </group>
     </actions>
 </idea-plugin>

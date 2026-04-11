@@ -18,6 +18,7 @@ import java.awt.BorderLayout
 import java.awt.FlowLayout
 import javax.swing.JButton
 import javax.swing.JEditorPane
+import javax.swing.text.html.HTMLEditorKit
 
 class MyToolWindowFactory : ToolWindowFactory {
 
@@ -35,6 +36,8 @@ class MyToolWindowFactory : ToolWindowFactory {
         private val projectService = toolWindow.project.service<MyProjectService>()
         private val geminiService = service<GeminiService>()
 
+        // This method constructs the entire UI of the tool window, including the explanation display area,
+        // navigation buttons, and API key management components.
         fun getContent() = JBPanel<JBPanel<*>>(BorderLayout()).apply {
             val mainPanel = this // Reference to the main panel for layout refreshes
 
@@ -43,11 +46,44 @@ class MyToolWindowFactory : ToolWindowFactory {
                 contentType = "text/html"
                 isEditable = false
                 margin = JBUI.insets(15)
-                // Ensures the pane uses the IDE's default font and colors
                 putClientProperty(JEditorPane.HONOR_DISPLAY_PROPERTIES, true)
-
-                // Standard IntelliJ listener to open links in the system browser
                 addHyperlinkListener(BrowserHyperlinkListener.INSTANCE)
+
+                // Inject safe, IDE-friendly CSS rules globally
+                val kit = HTMLEditorKit()
+                val styleSheet = kit.styleSheet
+                styleSheet.addRule("body { font-family: sans-serif; font-size: 13pt; line-height: 1.4; }")
+                styleSheet.addRule("h3 { color: #888888; margin-top: 15px; }")
+                styleSheet.addRule("pre { background-color: #2b2b2b; color: #a9b7c6; padding: 10px; border: 1px solid #555555; }")
+                styleSheet.addRule("code { font-family: monospace; background-color: #2b2b2b; color: #a9b7c6; padding: 2px 4px; }")
+                styleSheet.addRule("ul { margin-left: 15px; }")
+                styleSheet.addRule("li { margin-bottom: 5px; }")
+                styleSheet.addRule("pre { background-color: #2b2b2b; color: #a9b7c6; padding: 10px; border: 1px solid #555555; white-space: pre-wrap; word-wrap: break-word; }")
+                styleSheet.addRule("code { font-family: monospace; background-color: #2b2b2b; color: #a9b7c6; padding: 2px 4px; word-wrap: break-word; }")
+                editorKit = kit
+            }
+
+            // 2. Create the Navigation Panel with Back/Forward buttons
+            val backButton = JButton("< Back").apply { isEnabled = false }
+            val forwardButton = JButton("Forward >").apply { isEnabled = false }
+            val removeButton = JButton("Delete Tab").apply { isEnabled = false }
+
+            val navPanel = JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT)).apply {
+                add(backButton)
+                add(forwardButton)
+                add(removeButton)
+                border = JBUI.Borders.customLine(JBUI.CurrentTheme.ToolWindow.borderColor(), 0, 0, 1, 0)
+            }
+
+            backButton.addActionListener { projectService.goBack() }
+            forwardButton.addActionListener { projectService.goForward() }
+            removeButton.addActionListener { projectService.removeFromHistory() }
+
+            // Listen for Back/Forward button state updates from the service
+            projectService.navStateUpdater = { canGoBack, canGoForward, canDelete ->
+                backButton.isEnabled = canGoBack
+                forwardButton.isEnabled = canGoForward
+                removeButton.isEnabled = canDelete
             }
 
             // 2. Settings Components (API Key input and management)
@@ -55,7 +91,7 @@ class MyToolWindowFactory : ToolWindowFactory {
             val keyField = JBTextField(geminiService.getApiKey() ?: "", 20)
             val saveButton = JButton("Save")
             val editButton = JButton("Edit API Key")
-            
+
             // Dedicated Hyperlink component for easy access to the API key site
             val apiKeyLink = HyperlinkLabel("Get API Key").apply {
                 setHyperlinkTarget("https://aistudio.google.com/app/apikey")
@@ -108,6 +144,7 @@ class MyToolWindowFactory : ToolWindowFactory {
                     saveButton.isVisible = false
                     editButton.isVisible = true
                     apiKeyLink.isVisible = false
+
                 }
 
                 // Force Swing to recalculate the layout so components physically disappear/appear
@@ -146,9 +183,14 @@ class MyToolWindowFactory : ToolWindowFactory {
                 textArea.caretPosition = 0
             }
 
-            // Main Layout Assembly: Scrollable text in the center, settings at the bottom
+            // Main Layout Assembly: Navigation at top, Scrollable text in the center, settings at the bottom
+            add(navPanel, BorderLayout.NORTH)
             add(JBScrollPane(textArea), BorderLayout.CENTER)
             add(settingsPanel, BorderLayout.SOUTH)
+
+            // Load any existing history from the previous session (if available)
+            // This will overwrite the default "Highlight some code..." text if they have saved history.
+            projectService.refreshUI()
         }
     }
 }
