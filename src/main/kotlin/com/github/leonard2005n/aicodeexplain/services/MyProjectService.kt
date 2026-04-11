@@ -1,17 +1,16 @@
 package com.github.leonard2005n.aicodeexplain.services
 
 import com.intellij.openapi.components.Service
-import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
-import com.github.leonard2005n.aicodeexplain.MyBundle
 
 @Service(Service.Level.PROJECT)
 class MyProjectService(project: Project) {
 
-    init {
-        thisLogger().info(MyBundle.message("projectService", project.name))
-        thisLogger().warn("Don't forget to remove all non-needed sample code files with their corresponding registration entries in `plugin.xml`.")
-    }
+    // This is a callback function. The Tool Window will listen to this.
+    var uiUpdater: ((String) -> Unit)? = null
 
-    fun getRandomNumber() = (1..100).random()
+    // The Action will call this function to send the AI text to the Tool Window
+    fun updateExplanation(text: String) {
+        uiUpdater?.invoke(text)
+    }
 }

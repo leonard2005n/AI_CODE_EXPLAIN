@@ -12,4 +12,14 @@
         <toolWindow factoryClass="com.github.leonard2005n.aicodeexplain.toolWindow.MyToolWindowFactory" id="MyToolWindow"/>
         <postStartupActivity implementation="com.github.leonard2005n.aicodeexplain.startup.MyProjectActivity" />
     </extensions>
+
+    <actions>
+        <action id="ExplainCodeAiAction"
+                class="com.github.leonard2005n.aicodeexplain.Actions.ExplainCodeAction"
+                text="Explain Code with AI"
+                description="Asks Gemma AI to explain the selected code">
+
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+    </actions>
 </idea-plugin>
