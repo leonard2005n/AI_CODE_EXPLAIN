@@ -4,6 +4,13 @@ import com.google.genai.Client
 import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.components.Service
 
+data class ExplanationResult(
+    val text: String,
+    val promptTokens: Int = 0,
+    val candidateTokens: Int = 0,
+    val totalTokens: Int = 0
+)
+
 // Class for the gemini api, which is used to get the explanation of the code
 @Service(Service.Level.APP)
 class GeminiService {
@@ -20,12 +27,12 @@ class GeminiService {
         return PropertiesComponent.getInstance().getValue(API_KEY_STORAGE_ID)
     }
 
-    fun explainCode(prompt: String): String {
+    fun explainCode(prompt: String): ExplanationResult {
         return try {
             val apiKey = getApiKey()
 
             if (apiKey.isNullOrBlank()) {
-                return "API key not set. Please set the API key in the AI Explainer tab."
+                ExplanationResult(text = "API key is missing. Please set your API key in the settings.")
             }
 
             // 1. Build the simple client using the actual retrieved key
@@ -34,12 +41,21 @@ class GeminiService {
             // 2. Prepare the prompt
             val response = client.models.generateContent("gemma-4-31b-it", prompt, null)
 
-            // 3. Return the explanation
-            response.text() ?: "No explanation available."
+            // Extract token usage details from the response
+            val usage = response.usageMetadata().orElse(null)
+
+            // 3. Return the explanation text along with token usage details
+            ExplanationResult(
+                text = response.text() ?: "No explanation available.",
+                promptTokens = usage?.promptTokenCount()?.orElse(0) ?: 0,
+                candidateTokens = usage?.candidatesTokenCount()?.orElse(0) ?: 0,
+                totalTokens = usage?.totalTokenCount()?.orElse(0) ?: 0
+            )
+
 
         } catch (e: Exception) {
             e.printStackTrace()
-            return "An error occurred while trying to explain the code: ${e.message}"
+            ExplanationResult(text = "Error during API call: ${e.message}")
         }
     }
 }

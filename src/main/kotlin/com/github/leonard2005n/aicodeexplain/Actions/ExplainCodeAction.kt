@@ -70,18 +70,22 @@ class ExplainCodeAction : AnAction() {
 
                 // 3. Show the explanation in the Tool Window
                 ApplicationManager.getApplication().invokeLater {
-
-                    // Format the text using HTML so the JEditorPane renders it beautifully
                     val formattedText = """
-                        <html>
-                        <body style="font-family: sans-serif; padding: 10px;">
+                       <html>
+                       <body style="font-family: sans-serif; padding: 10px;">
                             <h3 style="color: #888888;">&#128269; ANALYZED SNIPPET:</h3>
-                            <hr>
-                            <pre style="background-color: #2b2b2b; padding: 10px;"><code>${selectedText.replace("<", "&lt;").replace(">", "&gt;")}</code></pre>
-                            <hr><br>
-                            
-                            <h3 style="color: #888888;">&#128161; AI EXPLANATION:</h3>
-                            <div style="line-height: 1.4;">$explanation</div>
+                        <hr>
+                        <pre style="background-color: #2b2b2b; padding: 10px;"><code>${selectedText.replace("<", "&lt;").replace(">", "&gt;")}</code></pre>
+                        <hr><br>
+            
+                        <h3 style="color: #888888;">&#128161; AI EXPLANATION:</h3>
+                        <div style="line-height: 1.4;">${explanation.text}</div>
+            
+                        <hr>
+                            <p style="color: #888888; font-size: 10px;">
+                                Tokens used: <b>${explanation.totalTokens}</b> 
+                                (Input: ${explanation.promptTokens}, Output: ${explanation.candidateTokens})
+                            </p>
                         </body>
                         </html>
                     """.trimIndent()
