@@ -31,6 +31,11 @@ repositories {
 
 // Dependencies are managed with Gradle version catalog - read more: https://docs.gradle.org/current/userguide/version_catalogs.html
 dependencies {
+
+    // Dependency for the Gemini API, which is used to get the explanation of the code
+    // The Gemini API is a wrapper around the Gemini API, which is used to get the explanation of the code
+    implementation("com.google.genai:google-genai:0.2.0")
+
     testImplementation(libs.junit)
     testImplementation(libs.opentest4j)
 
