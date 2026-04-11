@@ -1,29 +1,25 @@
 # AI_CODE_EXPLAIN
 
 ![Build](https://github.com/leonard2005n/AI_CODE_EXPLAIN/workflows/Build/badge.svg)
-[![Version](https://img.shields.io/jetbrains/plugin/v/MARKETPLACE_ID.svg)](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID)
-[![Downloads](https://img.shields.io/jetbrains/plugin/d/MARKETPLACE_ID.svg)](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID)
-
-## Template ToDo list
-- [x] Create a new [IntelliJ Platform Plugin Template][template] project.
-- [ ] Get familiar with the [template documentation][template].
-- [ ] Adjust the [pluginGroup](./gradle.properties) and [pluginName](./gradle.properties), as well as the [id](./src/main/resources/META-INF/plugin.xml) and [sources package](./src/main/kotlin).
-- [ ] Adjust the plugin description in `README` (see [Tips][docs:plugin-description])
-- [ ] Review the [Legal Agreements](https://plugins.jetbrains.com/docs/marketplace/legal-agreements.html?from=IJPluginTemplate).
-- [ ] [Publish a plugin manually](https://plugins.jetbrains.com/docs/intellij/publishing-plugin.html?from=IJPluginTemplate) for the first time.
-- [ ] Set the `MARKETPLACE_ID` in the above README badges. You can obtain it once the plugin is published to JetBrains Marketplace.
-- [ ] Set the [Plugin Signing](https://plugins.jetbrains.com/docs/intellij/plugin-signing.html?from=IJPluginTemplate) related [secrets](https://github.com/JetBrains/intellij-platform-plugin-template#environment-variables).
-- [ ] Set the [Deployment Token](https://plugins.jetbrains.com/docs/marketplace/plugin-upload.html?from=IJPluginTemplate).
-- [ ] Click the <kbd>Watch</kbd> button on the top of the [IntelliJ Platform Plugin Template][template] to be notified about releases containing new features and fixes.
-- [ ] Configure the [CODECOV_TOKEN](https://docs.codecov.com/docs/quick-start) secret for automated test coverage reports on PRs
+[![Version](https://img.shields.io/jetbrains/plugin/v/com.github.leonard2005n.aicodeexplain.svg)](https://plugins.jetbrains.com/plugin/com.github.leonard2005n.aicodeexplain)
 
 <!-- Plugin description -->
-This Fancy IntelliJ Platform Plugin is going to be your implementation of the brilliant ideas that you have.
+**AI_CODE_EXPLAIN** is an IntelliJ Platform Plugin designed to help developers understand complex code snippets quickly. By leveraging the power of Google's Gemini (specifically the `gemma-4-31b-it` model), it provides clear, structured explanations of selected code directly within your IDE.
 
-This specific section is a source for the [plugin.xml](/src/main/resources/META-INF/plugin.xml) file which will be extracted by the [Gradle](/build.gradle.kts) during the build process.
+### Features
+- **Instant AI Explanations**: Select any piece of code and get a detailed breakdown in seconds.
+- **Context-Aware Analysis**: The AI uses the full file context to provide more accurate and relevant explanations.
+- **Dedicated Tool Window**: View explanations in a clean, formatted tool window without losing your place in the code.
+- **Asynchronous Execution**: Requests are handled in the background, ensuring your IDE remains smooth and responsive.
+- **Formatted Output**: Enjoy easy-to-read explanations with high-level summaries and step-by-step breakdowns.
 
-To keep everything working, do not remove `<!-- ... -->` sections. 
 <!-- Plugin description end -->
+
+## How to Use
+
+1. **Select Code**: Highlight the code snippet you want to understand in any editor window.
+2. **Trigger Action**: Right-click on the selected text and choose **"Explain Code with AI"** from the context menu.
+3. **View Explanation**: The **"MyToolWindow"** will open automatically on the side, displaying the AI-generated explanation.
 
 ## Installation
 
@@ -43,7 +39,6 @@ To keep everything working, do not remove `<!-- ... -->` sections.
 
   Download the [latest release](https://github.com/leonard2005n/AI_CODE_EXPLAIN/releases/latest) and install it manually using
   <kbd>Settings/Preferences</kbd> > <kbd>Plugins</kbd> > <kbd>⚙️</kbd> > <kbd>Install plugin from disk...</kbd>
-
 
 ---
 Plugin based on the [IntelliJ Platform Plugin Template][template].
