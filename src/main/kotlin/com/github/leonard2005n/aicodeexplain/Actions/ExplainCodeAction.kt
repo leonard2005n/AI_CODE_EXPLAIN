@@ -28,32 +28,76 @@ class ExplainCodeAction : AnAction() {
         val selectedText = editor.selectionModel.selectedText ?: return
         val fileText = editor.document.text
 
-        if (selectedText.isNullOrBlank()) {
+        if (selectedText.isBlank()) {
             return
         }
+
+        // 2. Prepare the highly optimized prompt
+        val prompt = """
+                You are a Senior Software Engineer mentoring a junior developer. 
+                Your task is to explain the provided code snippet clearly, concisely, and in plain English.
+                
+                Use the full file context to understand how the snippet fits into the bigger picture, but focus your explanation specifically on the snippet.
+                
+                Structure your explanation exactly like this:
+                <p><b>High-Level Summary:</b> Briefly state what this snippet does in 1 or 2 sentences.</p>
+                <p><b>Step-by-Step Breakdown:</b></p>
+                <ul>
+                    <li>Explain the key logic, variables, or method calls line-by-line.</li>
+                    <li>Keep it easy to understand.</li>
+                </ul>
+                <p><b>Context:</b> Briefly explain why this snippet is important to the rest of the file.</p>
+                
+                CRITICAL FORMATTING RULES:
+                - You MUST format your entire response using ONLY basic HTML tags.
+                - Allowed tags: <b>, <i>, <br>, <p>, <ul>, <li>, <code>.
+                - DO NOT use Markdown under any circumstances (NO asterisks **, NO backticks `, NO hashes #).
+                
+                Snippet to explain:
+                $selectedText
+                
+                Full file context:
+                $fileText
+            """.trimIndent()
 
         // Run the explanation in a background task to avoid freezing the UI
         ProgressManager.getInstance().run(object : Task.Backgroundable(project, "Explaining Code...") {
             override fun run(indicator: ProgressIndicator) {
                 // 2. Call the GeminiService to get the explanation
+                // Note: Ensure GeminiService is registered as an application-level service in plugin.xml
                 val geminiService = ApplicationManager.getApplication().service<GeminiService>()
-                val explanation = geminiService.explainCode(selectedText, fileText)
+                val explanation = geminiService.explainCode(prompt)
 
-                // 3. Show the explanation in the Tool Window instead of a dialog
+                // 3. Show the explanation in the Tool Window
                 ApplicationManager.getApplication().invokeLater {
-                    // Send the formatted text to the Project Service bridge
-                    val projectService = project.service<MyProjectService>()
-                    projectService.updateExplanation("=== Code Analyzed ===\n$selectedText\n\n=== AI Explanation ===\n$explanation")
 
-                    // Automatically slide open the Tool Window so the user sees it
-                    val toolWindow = ToolWindowManager.getInstance(project).getToolWindow("MyToolWindow")
+                    // Format the text using HTML so the JEditorPane renders it beautifully
+                    val formattedText = """
+                        <html>
+                        <body style="font-family: sans-serif; padding: 10px;">
+                            <h3 style="color: #888888;">&#128269; ANALYZED SNIPPET:</h3>
+                            <hr>
+                            <pre style="background-color: #2b2b2b; padding: 10px;"><code>${selectedText.replace("<", "&lt;").replace(">", "&gt;")}</code></pre>
+                            <hr><br>
+                            
+                            <h3 style="color: #888888;">&#128161; AI EXPLANATION:</h3>
+                            <div style="line-height: 1.4;">$explanation</div>
+                        </body>
+                        </html>
+                    """.trimIndent()
+
+                    val projectService = project.service<MyProjectService>()
+                    projectService.updateExplanation(formattedText)
+
+                    // IMPORTANT: Ensure this string matches the 'id' you set in plugin.xml
+                    val toolWindow = ToolWindowManager.getInstance(project).getToolWindow("AI Explainer")
                     toolWindow?.show()
                 }
             }
         })
     }
 
-    // 5. This ensures the button is ONLY clickable if text is highlighted
+    // This ensures the button is ONLY clickable if text is highlighted
     override fun update(e: AnActionEvent) {
         val editor = e.getData(CommonDataKeys.EDITOR)
         e.presentation.isEnabledAndVisible = editor?.selectionModel?.hasSelection() == true

@@ -6,7 +6,9 @@ import com.intellij.psi.xml.XmlFile
 import com.intellij.testFramework.TestDataPath
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.util.PsiErrorElementUtil
+import com.github.leonard2005n.aicodeexplain.services.GeminiService
 import com.github.leonard2005n.aicodeexplain.services.MyProjectService
+import com.intellij.openapi.application.ApplicationManager
 
 @TestDataPath("\$CONTENT_ROOT/src/test/testData")
 class MyPluginTest : BasePlatformTestCase() {
@@ -31,8 +33,19 @@ class MyPluginTest : BasePlatformTestCase() {
 
     fun testProjectService() {
         val projectService = project.service<MyProjectService>()
+        var updatedText = ""
+        projectService.uiUpdater = { updatedText = it }
+        projectService.updateExplanation("Test update")
+        assertEquals("Test update", updatedText)
+    }
 
-        assertNotSame(projectService.getRandomNumber(), projectService.getRandomNumber())
+    fun testGeminiService() {
+        val geminiService = ApplicationManager.getApplication().service<GeminiService>()
+        assertNotNull("GeminiService should be registered", geminiService)
+        
+        val result = geminiService.explainCode("Test prompt")
+        assertNotNull("explainCode should return a result", result)
+        assertTrue("Result should be a string", result is String)
     }
 
     override fun getTestDataPath() = "src/test/testData/rename"
