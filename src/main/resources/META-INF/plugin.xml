@@ -11,9 +11,8 @@
     <extensions defaultExtensionNs="com.intellij">
         <toolWindow factoryClass="com.github.leonard2005n.aicodeexplain.toolWindow.MyToolWindowFactory"
                     id="AI Explainer"
-                    anchor="right" />
-
-        <postStartupActivity implementation="com.github.leonard2005n.aicodeexplain.startup.MyProjectActivity" />
+                    anchor="right"
+                    icon="/icons/iconAi.svg" /> <postStartupActivity implementation="com.github.leonard2005n.aicodeexplain.startup.MyProjectActivity" />
     </extensions>
 
     <actions>

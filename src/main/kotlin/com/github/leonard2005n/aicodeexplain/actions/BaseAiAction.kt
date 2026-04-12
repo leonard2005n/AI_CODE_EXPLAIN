@@ -10,6 +10,7 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
+import com.intellij.openapi.wm.ToolWindowManager
 import org.commonmark.parser.Parser
 import org.commonmark.renderer.html.HtmlRenderer
 
@@ -35,6 +36,9 @@ abstract class BaseAiAction(
         if (selectedText.isBlank()) {
             return
         }
+
+        // Automatically open the Tool Window so the user sees something is happening
+        ToolWindowManager.getInstance(project).getToolWindow("AI Explainer")?.show()
 
         // We capture the document and offsets instead of the whole text on the EDT
         val document = editor.document
