@@ -18,6 +18,7 @@ import java.awt.BorderLayout
 import java.awt.FlowLayout
 import javax.swing.JButton
 import javax.swing.JEditorPane
+import javax.swing.JProgressBar
 import javax.swing.text.html.HTMLEditorKit
 
 class MyToolWindowFactory : ToolWindowFactory {
@@ -86,11 +87,33 @@ class MyToolWindowFactory : ToolWindowFactory {
                 removeButton.isEnabled = canDelete
             }
 
-            // 2. Settings Components (API Key input and management)
+            // 3. Settings Components (API Key input and management)
             val apiLabel = JBLabel("API Key:")
             val keyField = JBTextField(geminiService.getApiKey() ?: "", 20)
             val saveButton = JButton("Save")
             val editButton = JButton("Edit API Key")
+
+
+            // 2. Add the progress bar right after creating navPanel
+            val progressBar = JProgressBar().apply {
+                isIndeterminate = true // Makes the bar slide back and forth automatically
+                isVisible = false      // Hidden by default
+            }
+
+            // Create a top panel to hold both the navigation and the progress bar together
+            val topPanel = JBPanel<JBPanel<*>>(BorderLayout()).apply {
+                add(navPanel, BorderLayout.CENTER)
+                add(progressBar, BorderLayout.SOUTH)
+            }
+
+            // Update the loading state from the service to show/hide the progress bar and display a temporary message
+            projectService.loadingStateUpdater = { isLoading ->
+                progressBar.isVisible = isLoading
+                if (isLoading) {
+                    // Show a temporary message while loading
+                    textArea.text = "<html><body><h3 style='color: #888888;'>&#8987; Generating response...</h3></body></html>"
+                }
+            }
 
             // Dedicated Hyperlink component for easy access to the API key site
             val apiKeyLink = HyperlinkLabel("Get API Key").apply {
@@ -184,7 +207,7 @@ class MyToolWindowFactory : ToolWindowFactory {
             }
 
             // Main Layout Assembly: Navigation at top, Scrollable text in the center, settings at the bottom
-            add(navPanel, BorderLayout.NORTH)
+            add(topPanel, BorderLayout.NORTH)
             add(JBScrollPane(textArea), BorderLayout.CENTER)
             add(settingsPanel, BorderLayout.SOUTH)
 
