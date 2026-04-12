@@ -42,7 +42,9 @@ abstract class BaseAiAction(
 
         // We capture the document and offsets instead of the whole text on the EDT
         val document = editor.document
+        val projectService = project.service<MyProjectService>()
 
+        projectService.setLoading(true)
         // Run the explanation in a background task to avoid freezing the UI
         ProgressManager.getInstance().run(object : Task.Backgroundable(project, taskTitle) {
             override fun run(indicator: ProgressIndicator) {
@@ -90,6 +92,9 @@ abstract class BaseAiAction(
                     val projectService = project.service<MyProjectService>()
                     projectService.addToHistory(finalHtml)
                 }
+            }
+            override fun onFinished() {
+                projectService.setLoading(false)
             }
         })
     }

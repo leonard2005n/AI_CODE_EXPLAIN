@@ -23,6 +23,7 @@ class MyProjectService(project: Project) : PersistentStateComponent<MyProjectSer
     // Callbacks for the UI
     var uiUpdater: ((String) -> Unit)? = null
     var navStateUpdater: ((Boolean, Boolean, Boolean) -> Unit)? = null // Updates Back/Forward button states
+    var loadingStateUpdater: ((Boolean) -> Unit)? = null // <-- NEW
 
     private var myState = State()
     private var currentIndex = -1
@@ -90,5 +91,11 @@ class MyProjectService(project: Project) : PersistentStateComponent<MyProjectSer
                     " <b>an AI action</b> to see the explanation here.</body></html>") // Clear UI if no valid history entryzz
         }
         navStateUpdater?.invoke(canGoBack(), canGoForward(), canDelete())
+    }
+
+
+    // Add this function anywhere inside the class:
+    fun setLoading(isLoading: Boolean) {
+        loadingStateUpdater?.invoke(isLoading)
     }
 }
