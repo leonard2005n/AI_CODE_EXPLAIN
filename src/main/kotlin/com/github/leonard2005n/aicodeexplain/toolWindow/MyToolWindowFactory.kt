@@ -20,6 +20,7 @@ import java.awt.FlowLayout
 import javax.swing.JButton
 import javax.swing.JEditorPane
 import javax.swing.JProgressBar
+import javax.swing.SwingUtilities
 import javax.swing.text.html.HTMLEditorKit
 import com.intellij.openapi.ui.ComboBox
 import java.awt.event.ItemEvent
@@ -67,6 +68,9 @@ class MyToolWindowFactory : ToolWindowFactory {
                 editorKit = kit
             }
 
+            // Flag to track whether we are actively streaming text
+            var isGenerating = false
+
             // Creating the histroy drop down
             val historyDropdown = ComboBox<HistoryEntry>().apply {
                 isSwingPopup = false
@@ -75,7 +79,7 @@ class MyToolWindowFactory : ToolWindowFactory {
             var removeButton = JButton("remove").apply {isEnabled = false}
 
 
-            val navPanel = JBPanel<JBPanel<*>>(BorderLayout()).apply { // <--- FIX THIS LINE
+            val navPanel = JBPanel<JBPanel<*>>(BorderLayout()).apply {
                 add(historyDropdown, BorderLayout.CENTER)
                 add(removeButton, BorderLayout.EAST)
                 border = JBUI.Borders.customLine(JBUI.CurrentTheme.ToolWindow.borderColor(), 0, 0, 1, 0)
@@ -84,7 +88,7 @@ class MyToolWindowFactory : ToolWindowFactory {
             // Button Actions for navigation
             historyDropdown.addItemListener { event ->
                 if (event.stateChange == ItemEvent.SELECTED) {
-                    val selectedIndex = historyDropdown.selectedIndex // <--- FIX THIS LINE
+                    val selectedIndex = historyDropdown.selectedIndex
                     if (selectedIndex != -1) {
                         projectService.selectHistoryEntry(selectedIndex)
                     }
@@ -131,6 +135,7 @@ class MyToolWindowFactory : ToolWindowFactory {
 
             // Update the loading state from the service to show/hide the progress bar and display a temporary message
             projectService.loadingStateUpdater = { isLoading ->
+                isGenerating = isLoading // Update our local tracking flag
                 progressBar.isVisible = isLoading
                 historyDropdown.isEnabled = !isLoading // Disable dropdown while loading
                 removeButton.isEnabled = !isLoading && historyDropdown.itemCount > 0
@@ -230,7 +235,21 @@ class MyToolWindowFactory : ToolWindowFactory {
             // Listen for updates from the ExplainCodeAction to display AI results
             projectService.uiUpdater = { newText ->
                 textArea.text = newText
-                textArea.caretPosition = 0
+
+                // Use invokeLater to wait for the HTML parser to finish rendering the layout
+                SwingUtilities.invokeLater {
+                    try {
+                        if (isGenerating) {
+                            // If actively streaming, scroll to follow the new text at the bottom
+                            textArea.caretPosition = textArea.document.length
+                        } else {
+                            // If user selected history, reset to top so they can read it
+                            textArea.caretPosition = 0
+                        }
+                    } catch (e: Exception) {
+                        // Document might not be fully parsed yet, safely ignore
+                    }
+                }
             }
 
             // Main Layout Assembly: Navigation at top, Scrollable text in the center, settings at the bottom

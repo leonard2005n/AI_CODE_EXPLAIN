@@ -1,6 +1,7 @@
 package com.github.leonard2005n.aicodeexplain.actions
 
 import com.github.leonard2005n.aicodeexplain.services.GeminiService
+import com.github.leonard2005n.aicodeexplain.services.ExplanationResult
 import com.github.leonard2005n.aicodeexplain.services.MyProjectService
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -32,7 +33,7 @@ abstract class BaseAiAction(
         // Capture only the necessary data from the EDT
         val selectionModel = editor.selectionModel
         val selectedText = selectionModel.selectedText ?: return
-        
+
         if (selectedText.isBlank()) {
             return
         }
@@ -41,7 +42,7 @@ abstract class BaseAiAction(
         ToolWindowManager.getInstance(project).getToolWindow("AI Explainer")?.show()
 
         // We capture the document and offsets instead of the whole text on the EDT
-        val document = editor.document
+        val editorDocument = editor.document
         val projectService = project.service<MyProjectService>()
 
         projectService.setLoading(true)
@@ -50,9 +51,7 @@ abstract class BaseAiAction(
         ProgressManager.getInstance().run(object : Task.Backgroundable(project, taskTitle) {
             override fun run(indicator: ProgressIndicator) {
                 // 1. Get the full file text in the background thread
-                // Note: document.text is safe to call in background if we don't need a specific read action (usually it's fine for just reading)
-                // However, for maximum safety in IntelliJ, we should use a read action if needed, but simple .text is often okay.
-                val fileText = document.text
+                val fileText = editorDocument.text
 
                 // 2. Prepare the highly optimized prompt (now in background!)
                 var prompt = getPrompt(selectedText, fileText)
@@ -67,55 +66,83 @@ abstract class BaseAiAction(
 
                 prompt = titleInstruction + prompt
 
-                // 3. Call the GeminiService to get the explanation
+                // 3. Setup Gemini Service and Markdown parsers
                 val geminiService = ApplicationManager.getApplication().service<GeminiService>()
-                val explanation = geminiService.explainCode(prompt)
-
-                // 4. Process the result in the background
-                var rawMarkdown = explanation.text
-                var aiTitle = "$resultHeader snippet"
-
-                //
-                val titleStart = rawMarkdown.indexOf("[TITLE]")
-                val titleEnd = rawMarkdown.indexOf("[/TITLE]")
-
-                if (titleStart != -1 && titleEnd != -1 && titleEnd > titleStart) {
-                    // Pull out the text between the tags
-                    aiTitle = rawMarkdown.substring(titleStart + 7, titleEnd).trim()
-                    // Remove the tags and the title from the markdown we render
-                    rawMarkdown = rawMarkdown.substring(titleEnd + 8).trim()
-                }
-
-                // 4. Parse the Markdown safely into clean HTML
                 val parser = Parser.builder().build()
-                val document = parser.parse(rawMarkdown)
                 val renderer = HtmlRenderer.builder().build()
-                val safeAiHtml = renderer.render(document)
+                val accumulatedMarkdown = StringBuilder()
 
-                // 5. Wrap it in your final layout
-                val finalHtml = """
-                                    <html>
-                                    <body style="font-family: sans-serif; padding: 10px;">
-                                        <h3 style="color: #888888;">&#128269; $resultHeader :</h3>
-                                        <hr>
-                                        <pre style="background-color: #2b2b2b; color: #a9b7c6; padding: 10px; white-space: pre-wrap; word-wrap: break-word;"><code>${selectedText.replace("<", "&lt;").replace(">", "&gt;")}</code></pre>
-                                        <hr><br>
-                                        <div style="line-height: 1.4;">$safeAiHtml</div>
-                                        
-                                        <div style="margin-top: 30px; padding-top: 10px; border-top: 1px dashed #555555; color: #999999; font-size: 10px; font-family: monospace;">
-                                            <b style="color: #888888;">Token usage</b><br>
-                                            Input: ${explanation.promptTokens} | Output: ${explanation.candidateTokens} | Total: ${explanation.totalTokens}
-                                        </div>
-                                    </body>
-                                    </html>
-                                """.trimIndent()
+                // Helper function to process the chunk, render HTML, and dispatch to UI thread
+                fun updateUI(currentMarkdown: String, isFinal: Boolean, usage: ExplanationResult? = null) {
+                    var rawMarkdown = currentMarkdown
+                    var aiTitle = "$resultHeader snippet"
 
-                // 6. Update the UI on the EDT
-                ApplicationManager.getApplication().invokeLater {
-                    val projectService = project.service<MyProjectService>()
-                    projectService.addToHistory(finalHtml, aiTitle)
+                    // Handle the TITLE tags dynamically during the stream
+                    val titleStart = rawMarkdown.indexOf("[TITLE]")
+                    val titleEnd = rawMarkdown.indexOf("[/TITLE]")
+
+                    if (titleStart != -1 && titleEnd != -1 && titleEnd > titleStart) {
+                        // Both tags are present: Pull out the title and remove tags from markdown
+                        aiTitle = rawMarkdown.substring(titleStart + 7, titleEnd).trim()
+                        rawMarkdown = rawMarkdown.substring(titleEnd + 8).trim()
+                    } else if (titleStart != -1 && !isFinal) {
+                        // Edge case during stream: The start tag arrived, but not the end tag yet.
+                        // We hide the partial "[TITLE] Gen..." text until the closing tag arrives.
+                        rawMarkdown = "Generating response..."
+                    }
+
+                    // Parse the accumulated Markdown safely into clean HTML
+                    val mdDocument = parser.parse(rawMarkdown)
+                    val safeAiHtml = renderer.render(mdDocument)
+
+                    // Only show tokens when finished
+                    val tokenHtml = if (isFinal && usage != null) {
+                        """<div style="margin-top: 30px; padding-top: 10px; border-top: 1px dashed #555555; color: #999999; font-size: 10px; font-family: monospace;">
+                            <b style="color: #888888;">Token usage</b><br>
+                            Input: ${usage.promptTokens} | Output: ${usage.candidateTokens} | Total: ${usage.totalTokens}
+                        </div>"""
+                    } else ""
+
+                    // Add a blinking cursor effect while generating
+                    val cursor = if (!isFinal) "<span style='color: #888888;'>&#9608;</span>" else ""
+
+                    // 5. Wrap it in your final layout
+                    val finalHtml = """
+                        <html>
+                        <body style="font-family: sans-serif; padding: 10px;">
+                            <h3 style="color: #888888;">&#128269; $resultHeader :</h3>
+                            <hr>
+                            <pre style="background-color: #2b2b2b; color: #a9b7c6; padding: 10px; white-space: pre-wrap; word-wrap: break-word;"><code>${selectedText.replace("<", "&lt;").replace(">", "&gt;")}</code></pre>
+                            <hr><br>
+                            <div style="line-height: 1.4;">$safeAiHtml$cursor</div>
+                            $tokenHtml
+                        </body>
+                        </html>
+                    """.trimIndent()
+
+                    // 6. Update the UI on the EDT
+                    ApplicationManager.getApplication().invokeLater {
+                        if (isFinal) {
+                            // Stream finished: Save it to our project state history with the extracted title
+                            projectService.addToHistory(finalHtml, aiTitle)
+                        } else {
+                            // Still streaming: Update the text pane without saving to history
+                            projectService.uiUpdater?.invoke(finalHtml)
+                        }
+                    }
                 }
+
+                // Execute the stream
+                val finalResult = geminiService.explainCodeStream(prompt) { chunk ->
+                    accumulatedMarkdown.append(chunk)
+                    // Push real-time updates to the UI as chunks arrive
+                    updateUI(accumulatedMarkdown.toString(), isFinal = false)
+                }
+
+                // Push the final result to UI and save to history
+                updateUI(finalResult.text, isFinal = true, usage = finalResult)
             }
+
             override fun onFinished() {
                 projectService.setLoading(false)
             }
