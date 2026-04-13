@@ -45,6 +45,7 @@ abstract class BaseAiAction(
         val projectService = project.service<MyProjectService>()
 
         projectService.setLoading(true)
+
         // Run the explanation in a background task to avoid freezing the UI
         ProgressManager.getInstance().run(object : Task.Backgroundable(project, taskTitle) {
             override fun run(indicator: ProgressIndicator) {
@@ -54,14 +55,36 @@ abstract class BaseAiAction(
                 val fileText = document.text
 
                 // 2. Prepare the highly optimized prompt (now in background!)
-                val prompt = getPrompt(selectedText, fileText)
+                var prompt = getPrompt(selectedText, fileText)
+
+                val titleInstruction = """
+                    CRITICAL INSTRUCTION: You MUST start your response with a 3 to 6 word title summarizing this specific request.
+                    Wrap the title exactly in these tags: [TITLE] Your Title Here [/TITLE]. 
+                    Do not put any other text before the [TITLE] tag.
+                    After the [/TITLE] tag, leave a blank line and provide your actual Markdown response.
+                    
+                """.trimIndent()
+
+                prompt = titleInstruction + prompt
 
                 // 3. Call the GeminiService to get the explanation
                 val geminiService = ApplicationManager.getApplication().service<GeminiService>()
                 val explanation = geminiService.explainCode(prompt)
 
                 // 4. Process the result in the background
-                val rawMarkdown = explanation.text
+                var rawMarkdown = explanation.text
+                var aiTitle = "$resultHeader snippet"
+
+                //
+                val titleStart = rawMarkdown.indexOf("[TITLE]")
+                val titleEnd = rawMarkdown.indexOf("[/TITLE]")
+
+                if (titleStart != -1 && titleEnd != -1 && titleEnd > titleStart) {
+                    // Pull out the text between the tags
+                    aiTitle = rawMarkdown.substring(titleStart + 7, titleEnd).trim()
+                    // Remove the tags and the title from the markdown we render
+                    rawMarkdown = rawMarkdown.substring(titleEnd + 8).trim()
+                }
 
                 // 4. Parse the Markdown safely into clean HTML
                 val parser = Parser.builder().build()
@@ -90,7 +113,7 @@ abstract class BaseAiAction(
                 // 6. Update the UI on the EDT
                 ApplicationManager.getApplication().invokeLater {
                     val projectService = project.service<MyProjectService>()
-                    projectService.addToHistory(finalHtml)
+                    projectService.addToHistory(finalHtml, aiTitle)
                 }
             }
             override fun onFinished() {

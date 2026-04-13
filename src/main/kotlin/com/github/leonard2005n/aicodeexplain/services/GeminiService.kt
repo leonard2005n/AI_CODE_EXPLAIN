@@ -32,7 +32,7 @@ class GeminiService {
             val apiKey = getApiKey()
 
             if (apiKey.isNullOrBlank()) {
-                ExplanationResult(text = "API key is missing. Please set your API key in the settings.")
+                return ExplanationResult(text = "API key is missing. Please set your API key in the settings.")
             }
 
             // 1. Build the simple client using the actual retrieved key

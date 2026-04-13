@@ -6,24 +6,33 @@ import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import com.intellij.openapi.project.Project
 
+
+// Create a data class for the History Item
+data class HistoryEntry(var explanation: String = "", var title: String = "") {
+    override fun toString(): String {
+        return title;
+    }
+}
+
 // This service will be project-level, meaning each project will have
 // its own instance of this service and its own persisted state.
 @Service(Service.Level.PROJECT)
 @State(
     name = "AICodeExplainHistory",
-    storages = [Storage("AICodeExplainHistory.xml")] // This file will be saved in the .idea folder
+    storages = [Storage("AICodeExplainHistoryV2.xml")] // This file will be saved in the .idea folder
 )
 class MyProjectService(project: Project) : PersistentStateComponent<MyProjectService.State> {
 
     // This is the state that will be persisted
     class State {
-        var history: MutableList<String> = mutableListOf()
+        var history: MutableList<HistoryEntry> = mutableListOf()
     }
 
     // Callbacks for the UI
     var uiUpdater: ((String) -> Unit)? = null
     var navStateUpdater: ((Boolean, Boolean, Boolean) -> Unit)? = null // Updates Back/Forward button states
-    var loadingStateUpdater: ((Boolean) -> Unit)? = null // <-- NEW
+    var loadingStateUpdater: ((Boolean) -> Unit)? = null
+    var dropdownListUpdater: ((List<HistoryEntry>, Int) -> Unit)? = null
 
     private var myState = State()
     private var currentIndex = -1
@@ -37,8 +46,8 @@ class MyProjectService(project: Project) : PersistentStateComponent<MyProjectSer
     }
 
     // 3. Methods to manage history
-    fun addToHistory(explanation: String) {
-        myState.history.add(explanation)
+    fun addToHistory(explanation: String ,title: String) {
+        myState.history.add(HistoryEntry(explanation, title))
 
         // Optional: Limit history size to 50 to prevent the XML file from getting too large
         if (myState.history.size > 50) {
@@ -46,21 +55,28 @@ class MyProjectService(project: Project) : PersistentStateComponent<MyProjectSer
         }
 
         currentIndex = myState.history.size - 1
-        updateUI()
+        refreshUI()
+    }
+
+    fun selectHistoryEntry(index: Int) {
+        if (index in myState.history.indices) {
+            currentIndex = index
+            refreshUI()
+        }
     }
 
     // 4. Navigation methods
     fun goBack() {
         if (canGoBack()) {
             currentIndex--
-            updateUI()
+            refreshUI()
         }
     }
 
     fun goForward() {
         if (canGoForward()) {
             currentIndex++
-            updateUI()
+            refreshUI()
         }
     }
 
@@ -71,7 +87,7 @@ class MyProjectService(project: Project) : PersistentStateComponent<MyProjectSer
              currentIndex = myState.history.size - 1
          }
 
-        updateUI()
+        refreshUI()
     }
 
 
@@ -80,19 +96,15 @@ class MyProjectService(project: Project) : PersistentStateComponent<MyProjectSer
     private fun canGoForward() = currentIndex < myState.history.size - 1
 
     fun refreshUI() {
-        updateUI()
-    }
-
-    private fun updateUI() {
         if (currentIndex in 0 until myState.history.size) {
-            uiUpdater?.invoke(myState.history[currentIndex])
+            uiUpdater?.invoke(myState.history[currentIndex].explanation)
         } else {
-            uiUpdater?.invoke("<html><body>Highlight some code, right-click, and select" +
-                    " <b>an AI action</b> to see the explanation here.</body></html>") // Clear UI if no valid history entryzz
+            uiUpdater?.invoke("<html><body>Highlight some code, right-click, and select an AI action to see the explanation here.</body></html>")
         }
-        navStateUpdater?.invoke(canGoBack(), canGoForward(), canDelete())
-    }
 
+        // Push the updated list to the Dropdown
+        dropdownListUpdater?.invoke(myState.history, currentIndex)
+    }
 
     // Add this function anywhere inside the class:
     fun setLoading(isLoading: Boolean) {

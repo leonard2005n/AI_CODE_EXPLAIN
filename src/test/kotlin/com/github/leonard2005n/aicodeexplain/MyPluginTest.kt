@@ -8,6 +8,8 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.util.PsiErrorElementUtil
 import com.github.leonard2005n.aicodeexplain.services.GeminiService
 import com.github.leonard2005n.aicodeexplain.services.MyProjectService
+import com.github.leonard2005n.aicodeexplain.services.HistoryEntry
+import com.github.leonard2005n.aicodeexplain.actions.*
 import com.intellij.openapi.application.ApplicationManager
 
 @TestDataPath("\$CONTENT_ROOT/src/test/testData")
@@ -35,17 +37,100 @@ class MyPluginTest : BasePlatformTestCase() {
         val projectService = project.service<MyProjectService>()
         var updatedText = ""
         projectService.uiUpdater = { updatedText = it }
-        projectService.updateExplanation("Test update")
-        assertEquals("Test update", updatedText)
+        projectService.addToHistory("Test explanation", "Test Title")
+        assertEquals("Test explanation", updatedText)
     }
 
     fun testGeminiService() {
         val geminiService = ApplicationManager.getApplication().service<GeminiService>()
         assertNotNull("GeminiService should be registered", geminiService)
-        
+
+        // Test with missing API key
+        geminiService.setApiKey("")
         val result = geminiService.explainCode("Test prompt")
         assertNotNull("explainCode should return a result", result)
-        assertTrue("Result should be a string", result is String)
+        assertTrue("Result should contain API key missing message", result.text.contains("API key is missing"))
+    }
+
+    fun testProjectServiceHistory() {
+        val projectService = project.service<MyProjectService>()
+        
+        projectService.addToHistory("Expl 1", "Title 1")
+        projectService.addToHistory("Expl 2", "Title 2")
+        projectService.addToHistory("Expl 3", "Title 3")
+        
+        assertEquals(2, projectService.state.history.size - 1) // currentIndex should be 2
+        
+        projectService.goBack()
+        var currentExpl = ""
+        projectService.uiUpdater = { currentExpl = it }
+        projectService.refreshUI()
+        assertEquals("Expl 2", currentExpl)
+        
+        projectService.goForward()
+        projectService.refreshUI()
+        assertEquals("Expl 3", currentExpl)
+        
+        projectService.selectHistoryEntry(0)
+        assertEquals("Expl 1", currentExpl)
+    }
+
+    fun testApiKeyPersistence() {
+        val geminiService = ApplicationManager.getApplication().service<GeminiService>()
+        val testKey = "test-api-key-123"
+        geminiService.setApiKey(testKey)
+        assertEquals(testKey, geminiService.getApiKey())
+        
+        geminiService.setApiKey("")
+        assertEquals("", geminiService.getApiKey())
+    }
+
+    fun testExplainCodeActionPrompt() {
+        val action = ExplainCodeAction()
+        val prompt = action.getPrompt("val x = 1", "package test\nval x = 1")
+        assertTrue(prompt.contains("val x = 1"))
+        assertTrue(prompt.contains("package test"))
+        assertTrue(prompt.contains("Senior Software Engineer"))
+    }
+
+    fun testDebugCodeActionPrompt() {
+        val action = DebugCodeAction()
+        val prompt = action.getPrompt("val x = 1", "package test\nval x = 1")
+        assertTrue(prompt.contains("val x = 1"))
+        assertTrue(prompt.contains("Senior QA Engineer"))
+    }
+
+    fun testGenerateTestsActionPrompt() {
+        val action = GenerateTestsAction()
+        val prompt = action.getPrompt("val x = 1", "package test\nval x = 1")
+        assertTrue(prompt.contains("val x = 1"))
+        assertTrue(prompt.contains("unit test code"))
+    }
+
+    fun testRefactorCodeActionPrompt() {
+        val action = RefactorCodeAction()
+        val prompt = action.getPrompt("val x = 1", "package test\nval x = 1")
+        assertTrue(prompt.contains("val x = 1"))
+        assertTrue(prompt.contains("refactoring and optimization"))
+    }
+
+    fun testProjectServiceStatePersistence() {
+        val projectService = MyProjectService(project)
+        val state = MyProjectService.State()
+        state.history.add(HistoryEntry("E1", "T1"))
+        state.history.add(HistoryEntry("E2", "T2"))
+        
+        projectService.loadState(state)
+        
+        var currentExpl = ""
+        projectService.uiUpdater = { currentExpl = it }
+        projectService.refreshUI()
+        
+        assertEquals("E2", currentExpl)
+        
+        projectService.goBack()
+        projectService.refreshUI()
+        assertEquals("E1", currentExpl)
     }
 
     override fun getTestDataPath() = "src/test/testData/rename"

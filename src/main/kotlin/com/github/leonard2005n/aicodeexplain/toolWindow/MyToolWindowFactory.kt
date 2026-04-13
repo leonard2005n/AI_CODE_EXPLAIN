@@ -1,6 +1,7 @@
 package com.github.leonard2005n.aicodeexplain.toolWindow
 
 import com.github.leonard2005n.aicodeexplain.services.GeminiService
+import com.github.leonard2005n.aicodeexplain.services.HistoryEntry
 import com.github.leonard2005n.aicodeexplain.services.MyProjectService
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
@@ -20,6 +21,8 @@ import javax.swing.JButton
 import javax.swing.JEditorPane
 import javax.swing.JProgressBar
 import javax.swing.text.html.HTMLEditorKit
+import com.intellij.openapi.ui.ComboBox
+import java.awt.event.ItemEvent
 
 class MyToolWindowFactory : ToolWindowFactory {
 
@@ -64,28 +67,47 @@ class MyToolWindowFactory : ToolWindowFactory {
                 editorKit = kit
             }
 
-            // 2. Create the Navigation Panel with Back/Forward buttons
-            val backButton = JButton("< Back").apply { isEnabled = false }
-            val forwardButton = JButton("Forward >").apply { isEnabled = false }
-            val removeButton = JButton("Delete Tab").apply { isEnabled = false }
+            // Creating the histroy drop down
+            val historyDropdown = ComboBox<HistoryEntry>().apply {
+                isSwingPopup = false
+            }
 
-            val navPanel = JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT)).apply {
-                add(backButton)
-                add(forwardButton)
-                add(removeButton)
+            var removeButton = JButton("remove").apply {isEnabled = false}
+
+
+            val navPanel = JBPanel<JBPanel<*>>(BorderLayout()).apply { // <--- FIX THIS LINE
+                add(historyDropdown, BorderLayout.CENTER)
+                add(removeButton, BorderLayout.EAST)
                 border = JBUI.Borders.customLine(JBUI.CurrentTheme.ToolWindow.borderColor(), 0, 0, 1, 0)
             }
 
             // Button Actions for navigation
-            backButton.addActionListener { projectService.goBack() }
-            forwardButton.addActionListener { projectService.goForward() }
+            historyDropdown.addItemListener { event ->
+                if (event.stateChange == ItemEvent.SELECTED) {
+                    val selectedIndex = historyDropdown.selectedIndex // <--- FIX THIS LINE
+                    if (selectedIndex != -1) {
+                        projectService.selectHistoryEntry(selectedIndex)
+                    }
+                }
+            }
             removeButton.addActionListener { projectService.removeFromHistory() }
 
-            // Listen for Back/Forward button state updates from the service
-            projectService.navStateUpdater = { canGoBack, canGoForward, canDelete ->
-                backButton.isEnabled = canGoBack
-                forwardButton.isEnabled = canGoForward
-                removeButton.isEnabled = canDelete
+            projectService.dropdownListUpdater = { historyList, selectedIndex ->
+                // Temporarily remove listener to avoid infinite loops while updating model
+                val listeners = historyDropdown.itemListeners
+                listeners.forEach { historyDropdown.removeItemListener(it) }
+
+                historyDropdown.removeAllItems()
+                historyList.forEach { historyDropdown.addItem(it) }
+
+                if (selectedIndex >= 0 && selectedIndex < historyDropdown.itemCount) {
+                    historyDropdown.selectedIndex = selectedIndex
+                }
+
+                removeButton.isEnabled = historyList.isNotEmpty()
+
+                // Re-add listener
+                listeners.forEach { historyDropdown.addItemListener(it) }
             }
 
             // 3. Settings Components (API Key input and management)
@@ -110,11 +132,10 @@ class MyToolWindowFactory : ToolWindowFactory {
             // Update the loading state from the service to show/hide the progress bar and display a temporary message
             projectService.loadingStateUpdater = { isLoading ->
                 progressBar.isVisible = isLoading
+                historyDropdown.isEnabled = !isLoading // Disable dropdown while loading
+                removeButton.isEnabled = !isLoading && historyDropdown.itemCount > 0
+
                 if (isLoading) {
-                    removeButton.isEnabled = false
-                    backButton.isEnabled = false
-                    forwardButton.isEnabled = false
-                    // Show a temporary message while loading
                     textArea.text = "<html><body><h3 style='color: #888888;'>&#8987; Generating response...</h3></body></html>"
                 } else {
                     projectService.refreshUI()
@@ -165,7 +186,7 @@ class MyToolWindowFactory : ToolWindowFactory {
                     apiKeyLink.isVisible = true
                 } else {
                     // READY MODE: Hide setup fields and show the default usage instructions
-                    textArea.text = "<html><body>Highlight some code, right-click, and select <b>'Explain Code with AI'</b> to see the explanation here.</body></html>"
+                    textArea.text = "<html><body>Highlight some code, right-click, and select an AI action to see the explanation here.</body></html>"
 
                     // Toggle visibility: hide input fields, show only edit button
                     apiLabel.isVisible = false
