@@ -34,7 +34,7 @@ dependencies {
 
     // Dependency for the Gemini API, which is used to get the explanation of the code
     // The Gemini API is a wrapper around the Gemini API, which is used to get the explanation of the code
-    implementation("com.google.genai:google-genai:0.2.0")
+    implementation("com.google.genai:google-genai:1.50.0")
     implementation("org.commonmark:commonmark:0.21.0")
 
     testImplementation(libs.junit)
