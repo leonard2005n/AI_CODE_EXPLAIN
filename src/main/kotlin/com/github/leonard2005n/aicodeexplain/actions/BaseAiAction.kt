@@ -14,6 +14,7 @@ import com.intellij.openapi.progress.Task
 import com.intellij.openapi.wm.ToolWindowManager
 import org.commonmark.parser.Parser
 import org.commonmark.renderer.html.HtmlRenderer
+import java.util.concurrent.ConcurrentLinkedQueue
 
 abstract class BaseAiAction(
     private val taskTitle: String,
@@ -70,7 +71,10 @@ abstract class BaseAiAction(
                 val geminiService = ApplicationManager.getApplication().service<GeminiService>()
                 val parser = Parser.builder().build()
                 val renderer = HtmlRenderer.builder().build()
-                val accumulatedMarkdown = StringBuilder()
+
+                var charQueue = ConcurrentLinkedQueue<Char>()
+                var isStreamFinished = false
+                val displayedMarkdown = StringBuilder()
 
                 // Helper function to process the chunk, render HTML, and dispatch to UI thread
                 fun updateUI(currentMarkdown: String, isFinal: Boolean, usage: ExplanationResult? = null) {
@@ -91,9 +95,18 @@ abstract class BaseAiAction(
                         rawMarkdown = "Generating response..."
                     }
 
+                    if (!isFinal) {
+                        rawMarkdown += "CURSOR_PLACEHOLDER"
+                    }
+
                     // Parse the accumulated Markdown safely into clean HTML
                     val mdDocument = parser.parse(rawMarkdown)
-                    val safeAiHtml = renderer.render(mdDocument)
+                    var safeAiHtml = renderer.render(mdDocument)
+
+                    // 2. Replace the placeholder with the styled HTML cursor inside the rendered HTML
+                    if (!isFinal) {
+                        safeAiHtml = safeAiHtml.replace("CURSOR_PLACEHOLDER", "<span style='color: #888888;'>&#9608;</span>")
+                    }
 
                     // Only show tokens when finished
                     val tokenHtml = if (isFinal && usage != null) {
@@ -114,7 +127,7 @@ abstract class BaseAiAction(
                             <hr>
                             <pre style="background-color: #2b2b2b; color: #a9b7c6; padding: 10px; white-space: pre-wrap; word-wrap: break-word;"><code>${selectedText.replace("<", "&lt;").replace(">", "&gt;")}</code></pre>
                             <hr><br>
-                            <div style="line-height: 1.4;">$safeAiHtml$cursor</div>
+                            <div style="line-height: 1.4;">$safeAiHtml</div>
                             $tokenHtml
                         </body>
                         </html>
@@ -132,12 +145,43 @@ abstract class BaseAiAction(
                     }
                 }
 
-                // Execute the stream
-                val finalResult = geminiService.explainCodeStream(prompt) { chunk ->
-                    accumulatedMarkdown.append(chunk)
-                    // Push real-time updates to the UI as chunks arrive
-                    updateUI(accumulatedMarkdown.toString(), isFinal = false)
+                val typewriterThread = Thread {
+                    while (!isStreamFinished || charQueue.isNotEmpty()) {
+                        if (charQueue.isNotEmpty()) {
+                            // Dynamically adjust typing speed: type faster if a large chunk arrived
+                            var charsToPull = if (charQueue.size > 200) 5 else 2
+                            var changed = false
+
+                            while (charsToPull > 0 && charQueue.isNotEmpty()) {
+                                displayedMarkdown.append(charQueue.poll())
+                                charsToPull--
+                                changed = true
+                            }
+
+                            if (changed) {
+                                // Update UI with the currently displayed markdown
+                                updateUI(displayedMarkdown.toString(), isFinal = false)
+                            }
+
+                            // Delay to create the smooth typewriter effect (15ms)
+                            Thread.sleep(15)
+                        } else {
+                            // Wait briefly for more characters to arrive from the network
+                            Thread.sleep(10)
+                        }
+                    }
                 }
+                typewriterThread.start()
+
+                // 3. Execute the network stream (Producer)
+                val finalResult = geminiService.explainCodeStream(prompt) { chunk ->
+                    // Instead of instantly updating the UI, offer the characters to the queue
+                    for (char in chunk) {
+                        charQueue.offer(char)
+                    }
+                }
+                isStreamFinished = true
+                typewriterThread.join()
 
                 // Push the final result to UI and save to history
                 updateUI(finalResult.text, isFinal = true, usage = finalResult)

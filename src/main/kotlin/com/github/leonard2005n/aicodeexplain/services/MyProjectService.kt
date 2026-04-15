@@ -30,9 +30,10 @@ class MyProjectService(project: Project) : PersistentStateComponent<MyProjectSer
 
     // Callbacks for the UI
     var uiUpdater: ((String) -> Unit)? = null
-    var navStateUpdater: ((Boolean, Boolean, Boolean) -> Unit)? = null // Updates Back/Forward button states
     var loadingStateUpdater: ((Boolean) -> Unit)? = null
     var dropdownListUpdater: ((List<HistoryEntry>, Int) -> Unit)? = null
+
+    var scrollToTop = false
 
     private var myState = State()
     private var currentIndex = -1
@@ -55,27 +56,14 @@ class MyProjectService(project: Project) : PersistentStateComponent<MyProjectSer
         }
 
         currentIndex = myState.history.size - 1
+        scrollToTop = false
         refreshUI()
     }
 
     fun selectHistoryEntry(index: Int) {
         if (index in myState.history.indices) {
             currentIndex = index
-            refreshUI()
-        }
-    }
-
-    // 4. Navigation methods
-    fun goBack() {
-        if (canGoBack()) {
-            currentIndex--
-            refreshUI()
-        }
-    }
-
-    fun goForward() {
-        if (canGoForward()) {
-            currentIndex++
+            scrollToTop = true
             refreshUI()
         }
     }
@@ -86,14 +74,10 @@ class MyProjectService(project: Project) : PersistentStateComponent<MyProjectSer
          if (currentIndex >= myState.history.size) {
              currentIndex = myState.history.size - 1
          }
-
+        scrollToTop = true
         refreshUI()
     }
 
-
-    private fun canDelete() = currentIndex >= 0
-    private fun canGoBack() = currentIndex > 0
-    private fun canGoForward() = currentIndex < myState.history.size - 1
 
     fun refreshUI() {
         if (currentIndex in 0 until myState.history.size) {

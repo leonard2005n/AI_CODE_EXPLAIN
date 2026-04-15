@@ -236,10 +236,13 @@ class MyToolWindowFactory : ToolWindowFactory {
             projectService.uiUpdater = { newText ->
                 textArea.text = newText
 
+                val shouldScrollToTop = projectService.scrollToTop
+                projectService.scrollToTop = false
+
                 // Use invokeLater to wait for the HTML parser to finish rendering the layout
                 SwingUtilities.invokeLater {
                     try {
-                        if (isGenerating) {
+                        if (!shouldScrollToTop) {
                             // If actively streaming, scroll to follow the new text at the bottom
                             textArea.caretPosition = textArea.document.length
                         } else {
