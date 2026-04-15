@@ -59,19 +59,16 @@ class MyPluginTest : BasePlatformTestCase() {
         projectService.addToHistory("Expl 2", "Title 2")
         projectService.addToHistory("Expl 3", "Title 3")
         
-        assertEquals(2, projectService.state.history.size - 1) // currentIndex should be 2
-        
-        projectService.goBack()
         var currentExpl = ""
         projectService.uiUpdater = { currentExpl = it }
-        projectService.refreshUI()
+        
+        projectService.selectHistoryEntry(projectService.state.history.size - 2)
         assertEquals("Expl 2", currentExpl)
         
-        projectService.goForward()
-        projectService.refreshUI()
+        projectService.selectHistoryEntry(projectService.state.history.size - 1)
         assertEquals("Expl 3", currentExpl)
         
-        projectService.selectHistoryEntry(0)
+        projectService.selectHistoryEntry(projectService.state.history.size - 3)
         assertEquals("Expl 1", currentExpl)
     }
 
@@ -128,8 +125,7 @@ class MyPluginTest : BasePlatformTestCase() {
         
         assertEquals("E2", currentExpl)
         
-        projectService.goBack()
-        projectService.refreshUI()
+        projectService.selectHistoryEntry(0)
         assertEquals("E1", currentExpl)
     }
 
